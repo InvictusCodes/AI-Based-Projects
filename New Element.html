@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIG BANG | Atomic Simulation Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+        
+        :root {
+            --primary: #0abeff;
+            --primary-dark: #0077cc;
+            --secondary: #e62429;
+            --accent: #f0b323;
+            --dark: #0a0e17;
+            --darker: #050a14;
+            --light: #e0f7ff;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: var(--darker);
+            color: var(--light);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+        
+        .mono {
+            font-family: 'Share Tech Mono', monospace;
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+        }
+        
+        .glow-box {
+            box-shadow: 0 0 10px var(--primary), 0 0 20px rgba(10, 190, 255, 0.3);
+        }
+        
+        .panel {
+            background: rgba(10, 20, 30, 0.8);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .hexagon {
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            background: linear-gradient(135deg, var(--primary), rgba(10, 190, 255, 0.3));
+        }
+        
+        .circuit-bg {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cpath d='M15 15h70v70H15z' fill='none' stroke='%230a3b5c' stroke-width='1'/%3E%3Cpath d='M30 15v15M50 15v15M70 15v15M15 30h15M15 50h15M15 70h15M85 30h-15M85 50h-15M85 70h-15M30 85v-15M50 85v-15M70 85v-15' stroke='%230a3b5c' stroke-width='1'/%3E%3C/svg%3E");
+            background-size: 50px 50px;
+        }
+        
+        .blueprint-grid {
+            background-size: 50px 50px;
+            background-image:
+                linear-gradient(to right, rgba(10, 190, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(10, 190, 255, 0.05) 1px, transparent 1px);
+        }
+        
+        .scan-line {
+            position: absolute;
+            height: 2px;
+            width: 100%;
+            background-color: var(--primary);
+            opacity: 0.7;
+            animation: scanAnimation 2s linear infinite;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        @keyframes scanAnimation {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        
+        .hologram {
+            position: relative;
+            perspective: 1000px;
+        }
+        
+        .hologram-content {
+            transform-style: preserve-3d;
+            animation: hologramFloat 5s ease-in-out infinite;
+        }
+        
+        @keyframes hologramFloat {
+            0%, 100% { transform: translateY(0) rotateY(0deg); }
+            50% { transform: translateY(-10px) rotateY(5deg); }
+        }
+        
+        .hologram-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(to right, rgba(10, 190, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(10, 190, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            pointer-events: none;
+        }
+        
+        .data-stream {
+            position: absolute;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            color: rgba(10, 190, 255, 0.7);
+            white-space: nowrap;
+            animation: dataStream 10s linear infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes dataStream {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        
+        .atom-container {
+            width: 100%;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #atom-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .control-btn {
+            background: rgba(10, 190, 255, 0.2);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(10, 190, 255, 0.4);
+            box-shadow: 0 0 10px var(--primary);
+        }
+        
+        .control-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            transition: all 0.5s ease;
+        }
+        
+        .proton {
+            background: radial-gradient(circle at 30% 30%, #ff5a5f, #c81d25);
+            box-shadow: 0 0 10px #ff5a5f;
+        }
+        
+        .neutron {
+            background: radial-gradient(circle at 30% 30%, #5a6268, #343a40);
+            box-shadow: 0 0 10px #5a6268;
+        }
+        
+        .electron {
+            background: radial-gradient(circle at 30% 30%, #4cc9f0, #4361ee);
+            box-shadow: 0 0 10px #4cc9f0;
+        }
+        
+        .arc-reactor {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+        }
+        
+        .arc-reactor-outer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 6px solid #0a3b5c;
+            box-shadow: 0 0 20px var(--primary), inset 0 0 20px var(--primary);
+            animation: pulse 2s infinite alternate;
+        }
+        
+        .arc-reactor-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary) 0%, #053a5f 70%);
+            box-shadow: 0 0 30px var(--primary);
+            z-index: 2;
+        }
+        
+        .arc-reactor-core {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%;
+            height: 30%;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 0 40px #ffffff;
+            z-index: 3;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.8; box-shadow: 0 0 20px var(--primary), inset 0 0 20px var(--primary); }
+            100% { opacity: 1; box-shadow: 0 0 30px var(--primary), inset 0 0 30px var(--primary); }
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background: rgba(10, 190, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 10px var(--primary);
+        }
+        
+        .element-card {
+            background: rgba(10, 30, 50, 0.7);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .element-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(10, 190, 255, 0.3);
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(10, 30, 50, 0.9);
+            border: 1px solid var(--primary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: var(--light);
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .rotating {
+            animation: rotate 20s linear infinite;
+        }
+        
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 3D Transforms */
+        .scene {
+            perspective: 1000px;
+        }
+        
+        .cube {
+            transform-style: preserve-3d;
+            position: relative;
+            width: 100px;
+            height: 100px;
+            transform: rotateX(-20deg) rotateY(30deg);
+            animation: cubeSpin 20s infinite linear;
+        }
+        
+        @keyframes cubeSpin {
+            0% { transform: rotateX(-20deg) rotateY(0deg); }
+            100% { transform: rotateX(-20deg) rotateY(360deg); }
+        }
+        
+        .cube-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 1px solid var(--primary);
+            background: rgba(10, 190, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .front { transform: translateZ(50px); }
+        .back { transform: rotateY(180deg) translateZ(50px); }
+        .right { transform: rotateY(90deg) translateZ(50px); }
+        .left { transform: rotateY(-90deg) translateZ(50px); }
+        .top { transform: rotateX(90deg) translateZ(50px); }
+        .bottom { transform: rotateX(-90deg) translateZ(50px); }
+    </style>
+</head>
+<body class="circuit-bg">
+    <!-- Data Streams Animation -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div class="data-stream" style="left: 10%; animation-duration: 15s;">01000010 01001001 01000111 00100000 01000010 01000001 01001110 01000111</div>
+        <div class="data-stream" style="left: 25%; animation-duration: 12s; animation-delay: 1s;">01000001 01010100 01001111 01001101 01001001 01000011</div>
+        <div class="data-stream" style="left: 40%; animation-duration: 18s; animation-delay: 2s;">01010000 01010010 01001111 01010100 01001111 01001110 01010011</div>
+        <div class="data-stream" style="left: 65%; animation-duration: 14s; animation-delay: 0.5s;">01001110 01000101 01010101 01010100 01010010 01001111 01001110 01010011</div>
+        <div class="data-stream" style="left: 85%; animation-duration: 16s; animation-delay: 1.5s;">01000101 01001100 01000101 01000011 01010100 01010010 01001111 01001110 01010011</div>
+    </div>
+
+    <div class="min-h-screen flex flex-col relative z-10">
+        <!-- Header -->
+        <header class="p-4 border-b border-blue-500">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex items-center">
+                    <div class="hexagon w-10 h-10 flex items-center justify-center mr-3">
+                        <span class="text-white font-bold">BB</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-blue-400 glow-text">BIG BANG</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-blue-400">
+                        <span id="current-time" class="glow-text mono">00:00:00</span>
+                    </div>
+                    <div class="panel px-4 py-2 rounded-md">
+                        <span id="system-status" class="text-green-400 mono">SIMULATION READY</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Panel - Controls -->
+                <div class="panel p-6 lg:col-span-1">
+                    <h2 class="text-xl font-bold text-blue-400 glow-text mb-4">ATOMIC CONTROLS</h2>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-blue-300 mb-2">ELEMENT SELECTION</h3>
+                        <select id="element-selector" class="w-full bg-gray-900 border border-blue-500 text-blue-300 p-2 rounded">
+                            <option value="hydrogen">Hydrogen (H)</option>
+                            <option value="helium">Helium (He)</option>
+                            <option value="lithium">Lithium (Li)</option>
+                            <option value="carbon">Carbon (C)</option>
+                            <option value="oxygen">Oxygen (O)</option>
+                            <option value="custom">Custom Element</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-blue-300 mb-2">PARTICLE CONFIGURATION</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-gray-400 mb-1">Protons</label>
+                                <div class="flex items-center">
+                                    <button id="proton-minus" class="control-btn px-2">-</button>
+                                    <input type="number" id="proton-count" class="w-full bg-gray-900 border border-blue-500 text-blue-300 p-2 text-center mx-2" value="1" min="1" max="118">
+                                    <button id="proton-plus" class="control-btn px-2">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 mb-1">Neutrons</label>
+                                <div class="flex items-center">
+                                    <button id="neutron-minus" class="control-btn px-2">-</button>
+                                    <input type="number" id="neutron-count" class="w-full bg-gray-900 border border-blue-500 text-blue-300 p-2 text-center mx-2" value="0" min="0" max="150">
+                                    <button id="neutron-plus" class="control-btn px-2">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-gray-400 mb-1">Electrons</label>
+                            <div class="flex items-center">
+                                <button id="electron-minus" class="control-btn px-2">-</button>
+                                <input type="number" id="electron-count" class="w-full bg-gray-900 border border-blue-500 text-blue-300 p-2 text-center mx-2" value="1" min="1" max="118">
+                                <button id="electron-plus" class="control-btn px-2">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-blue-300 mb-2">SIMULATION CONTROLS</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button id="btn-generate" class="control-btn">GENERATE ATOM</button>
+                            <button id="btn-separate" class="control-btn">SEPARATE PARTICLES</button>
+                            <button id="btn-reset" class="control-btn">RESET</button>
+                            <button id="btn-fusion" class="control-btn">INITIATE FUSION</button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-blue-300 mb-2">VISUALIZATION</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button id="btn-view-3d" class="control-btn">3D VIEW</button>
+                            <button id="btn-view-2d" class="control-btn">2D VIEW</button>
+                            <button id="btn-orbit" class="control-btn">ORBIT CAMERA</button>
+                            <button id="btn-explode" class="control-btn">EXPLODE VIEW</button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <h3 class="text-blue-300 mb-2">SIMULATION STATUS</h3>
+                        <div class="panel p-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-gray-400">Stability:</span>
+                                <span id="stability-value" class="text-green-400">98.7%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="stability-bar" class="progress-fill" style="width: 98.7%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="panel p-3 mt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-gray-400">Energy Output:</span>
+                                <span id="energy-value" class="text-yellow-400">1.21 GW</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="energy-bar" class="progress-fill" style="width: 45%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="panel p-3 mt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-gray-400">Quantum Coherence:</span>
+                                <span id="coherence-value" class="text-blue-400">76.3%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="coherence-bar" class="progress-fill" style="width: 76.3%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Middle Panel - 3D Visualization -->
+                <div class="panel p-6 lg:col-span-2 relative">
+                    <h2 class="text-xl font-bold text-blue-400 glow-text mb-4">ATOMIC VISUALIZATION</h2>
+                    
+                    <div class="atom-container">
+                        <canvas id="atom-canvas"></canvas>
+                        <div class="scan-line"></div>
+                        <div class="hologram-grid"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mt-6">
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">ATOMIC MASS</div>
+                            <div class="flex justify-between items-center">
+                                <div id="atomic-mass" class="text-xl font-bold text-blue-400">1.008 u</div>
+                                <div class="text-green-400 text-sm">STABLE</div>
+                            </div>
+                        </div>
+                        
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">ATOMIC NUMBER</div>
+                            <div class="flex justify-between items-center">
+                                <div id="atomic-number" class="text-xl font-bold text-blue-400">1</div>
+                                <div class="text-blue-400 text-sm">HYDROGEN</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="absolute bottom-2 right-2 text-xs text-blue-400 opacity-50 mono">
+                        QUANTUM SIMULATION v2.4.7 • BIG BANG SYSTEMS
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Arc Reactor Fusion Section -->
+            <div class="panel p-6 mt-6 relative">
+                <h2 class="text-xl font-bold text-blue-400 glow-text mb-4">ELEMENT FUSION CHAMBER</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-1">
+                        <div class="arc-reactor mb-6">
+                            <div class="arc-reactor-outer"></div>
+                            <div class="arc-reactor-inner"></div>
+                            <div class="arc-reactor-core"></div>
+                        </div>
+                        
+                        <div class="panel p-3 mb-4">
+                            <div class="text-sm text-gray-400 mb-1">REACTOR STATUS</div>
+                            <div class="flex justify-between items-center">
+                                <div id="reactor-status" class="text-xl font-bold text-green-400">READY</div>
+                                <div class="text-blue-400 text-sm">STANDBY</div>
+                            </div>
+                            <div class="progress-bar mt-2">
+                                <div id="reactor-bar" class="progress-fill" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">FUSION PROGRESS</div>
+                            <div class="flex justify-between items-center">
+                                <div id="fusion-progress" class="text-xl font-bold text-blue-400">0%</div>
+                                <div id="fusion-status" class="text-yellow-400 text-sm">WAITING</div>
+                            </div>
+                            <div class="progress-bar mt-2">
+                                <div id="fusion-bar" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <button id="btn-start-fusion" class="control-btn w-full py-3">INITIATE FUSION SEQUENCE</button>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:col-span-2">
+                        <div class="panel p-4 h-full relative blueprint-grid">
+                            <h3 class="text-blue-300 mb-4">ELEMENT SYNTHESIS</h3>
+                            
+                            <div id="fusion-container" class="flex flex-wrap gap-4 mb-6">
+                                <div class="element-card w-24 h-24 flex flex-col items-center justify-center">
+                                    <div class="text-xs text-gray-400">DRAG PARTICLES</div>
+                                    <div class="text-center mt-2">
+                                        <div class="text-2xl font-bold text-blue-400">?</div>
+                                        <div class="text-xs text-gray-400">EMPTY</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="element-card w-24 h-24 flex flex-col items-center justify-center">
+                                    <div class="text-xs text-gray-400">DRAG PARTICLES</div>
+                                    <div class="text-center mt-2">
+                                        <div class="text-2xl font-bold text-blue-400">?</div>
+                                        <div class="text-xs text-gray-400">EMPTY</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="element-card w-24 h-24 flex flex-col items-center justify-center">
+                                    <div class="text-xs text-gray-400">DRAG PARTICLES</div>
+                                    <div class="text-center mt-2">
+                                        <div class="text-2xl font-bold text-blue-400">?</div>
+                                        <div class="text-xs text-gray-400">EMPTY</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="panel p-4 mb-4">
+                                <h4 class="text-blue-300 mb-2">NEW ELEMENT PROPERTIES</h4>
+                                <div id="new-element-properties" class="text-gray-400 text-sm">
+                                    <p>No element synthesized yet. Drag particles to the fusion chamber and initiate fusion sequence.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-wrap gap-4">
+                                <div class="particle-container" id="proton-container">
+                                    <div class="particle proton" style="width: 30px; height: 30px;"></div>
+                                    <div class="text-xs text-center mt-1 text-red-400">PROTON</div>
+                                </div>
+                                
+                                <div class="particle-container" id="neutron-container">
+                                    <div class="particle neutron" style="width: 30px; height: 30px;"></div>
+                                    <div class="text-xs text-center mt-1 text-gray-400">NEUTRON</div>
+                                </div>
+                                
+                                <div class="particle-container" id="electron-container">
+                                    <div class="particle electron" style="width: 20px; height: 20px;"></div>
+                                    <div class="text-xs text-center mt-1 text-blue-400">ELECTRON</div>
+                                </div>
+                            </div>
+                            
+                            <div class="absolute bottom-2 right-2 text-xs text-blue-400 opacity-50 mono">
+                                FUSION CHAMBER • EXPERIMENTAL • BIG BANG SYSTEMS
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Element Database -->
+            <div class="panel p-6 mt-6 relative">
+                <h2 class="text-xl font-bold text-blue-400 glow-text mb-4">ELEMENT DATABASE</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="element-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-3xl font-bold text-blue-400">H</div>
+                            <div class="text-sm text-gray-400">1</div>
+                        </div>
+                        <div class="text-lg font-semibold text-white">Hydrogen</div>
+                        <div class="text-sm text-gray-400 mt-1">1.008 u</div>
+                        <div class="flex justify-between text-xs text-gray-400 mt-2">
+                            <span>P: 1</span>
+                            <span>N: 0</span>
+                            <span>E: 1</span>
+                        </div>
+                    </div>
+                    
+                    <div class="element-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-3xl font-bold text-blue-400">He</div>
+                            <div class="text-sm text-gray-400">2</div>
+                        </div>
+                        <div class="text-lg font-semibold text-white">Helium</div>
+                        <div class="text-sm text-gray-400 mt-1">4.003 u</div>
+                        <div class="flex justify-between text-xs text-gray-400 mt-2">
+                            <span>P: 2</span>
+                            <span>N: 2</span>
+                            <span>E: 2</span>
+                        </div>
+                    </div>
+                    
+                    <div class="element-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-3xl font-bold text-blue-400">Li</div>
+                            <div class="text-sm text-gray-400">3</div>
+                        </div>
+                        <div class="text-lg font-semibold text-white">Lithium</div>
+                        <div class="text-sm text-gray-400 mt-1">6.941 u</div>
+                        <div class="flex justify-between text-xs text-gray-400 mt-2">
+                            <span>P: 3</span>
+                            <span>N: 4</span>
+                            <span>E: 3</span>
+                        </div>
+                    </div>
+                    
+                    <div class="element-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-3xl font-bold text-yellow-400">?</div>
+                            <div class="text-sm text-gray-400">NEW</div>
+                        </div>
+                        <div class="text-lg font-semibold text-white">Custom Element</div>
+                        <div class="text-sm text-gray-400 mt-1">Synthesize in reactor</div>
+                        <div class="flex justify-between text-xs text-gray-400 mt-2">
+                            <span>P: ?</span>
+                            <span>N: ?</span>
+                            <span>E: ?</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="absolute bottom-2 right-2 text-xs text-blue-400 opacity-50 mono">
+                    ELEMENT DATABASE • 118 KNOWN ELEMENTS • BIG BANG SYSTEMS
+                </div>
+            </div>
+            
+            <!-- 3D Holographic Controls -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div class="panel p-6 relative">
+                    <h2 class="text-xl font-bold text-blue-400 glow-text mb-4">3D HOLOGRAPHIC CONTROLS</h2>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">ROTATION SPEED</div>
+                            <input type="range" id="rotation-speed" min="0" max="100" value="50" class="w-full">
+                        </div>
+                        
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">ZOOM LEVEL</div>
+                            <input type="range" id="zoom-level" min="0" max="100" value="70" class="w-full">
+                        </div>
+                        
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">PARTICLE SIZE</div>
+                            <input type="range" id="particle-size" min="0" max="100" value="60" class="w-full">
+                        </div>
+                        
+                        <div class="panel p-3">
+                            <div class="text-sm text-gray-400 mb-1">GLOW INTENSITY</div>
+                            <input type="range" id="glow-intensity" min="0" max="100" value="80" class="w-full">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <button id="btn-screenshot" class="control-btn">CAPTURE HOLOGRAM</button>
+                        <button id="btn-export" class="control-btn">EXPORT MODEL</button>
+                    </div>
+                    
+                    <div class="absolute bottom-2 right-2 text-xs text-blue-400 opacity-50 mono">
+                        HOLOGRAPHIC INTERFACE v1.7.3 • BIG BANG SYSTEMS
+                    </div>
+                </div>
+                
+                <div class="panel p-6 relative">
+                    <h2 class="text-xl font-bold text-blue-400 glow-text mb-4">QUANTUM CALCULATIONS</h2>
+                    
+                    <div class="scene h-40 mb-6 flex justify-center items-center">
+                        <div class="cube">
+                            <div class="cube-face front">E=mc²</div>
+                            <div class="cube-face back">ΔE·Δt ≥ ℏ/2</div>
+                            <div class="cube-face right">Ψ</div>
+                            <div class="cube-face left">σₓ·σₚ ≥ ℏ/2</div>
+                            <div class="cube-face top">∇²Ψ</div>
+                            <div class="cube-face bottom">iℏ∂Ψ/∂t</div>
+                        </div>
+                    </div>
+                    
+                    <div class="panel p-3 mb-4">
+                        <div class="text-sm text-gray-400 mb-1">QUANTUM STATE</div>
+                        <div class="mono text-blue-400 text-sm">
+                            Ψ(r,t) = Σ cₙ ψₙ(r) e^(-iEₙt/ℏ)
+                        </div>
+                    </div>
+                    
+                    <div class="panel p-3">
+                        <div class="text-sm text-gray-400 mb-1">BINDING ENERGY</div>
+                        <div id="binding-energy" class="mono text-blue-400 text-sm">
+                            E_b = [Z·m_p + N·m_n - M(Z,N)]·c²
+                        </div>
+                    </div>
+                    
+                    <div class="absolute bottom-2 right-2 text-xs text-blue-400 opacity-50 mono">
+                        QUANTUM CALCULATOR • THEORETICAL PHYSICS • BIG BANG SYSTEMS
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="p-4 border-t border-blue-900">
+            <div class="container mx-auto flex justify-between items-center text-sm">
+                <div class="text-gray-500 mono">
+                    BIG BANG • ATOMIC SIMULATION INTERFACE • v2.4.7
+                </div>
+                <div class="text-blue-400">
+                    © BIG BANG SYSTEMS
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Three.js
+            const canvas = document.getElementById('atom-canvas');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            
+            // Add directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Add point light at center
+            const pointLight = new THREE.PointLight(0x0abeff, 2, 100);
+            pointLight.position.set(0, 0, 0);
+            scene.add(pointLight);
+            
+            // Set camera position
+            camera.position.z = 5;
+            
+            // Create nucleus group
+            const nucleus = new THREE.Group();
+            scene.add(nucleus);
+            
+            // Create electron shells group
+            const electronShells = new THREE.Group();
+            scene.add(electronShells);
+            
+            // Materials
+            const protonMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xff5a5f, 
+                emissive: 0xc81d25,
+                emissiveIntensity: 0.3,
+                shininess: 30
+            });
+            
+            const neutronMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x5a6268, 
+                emissive: 0x343a40,
+                emissiveIntensity: 0.2,
+                shininess: 20
+            });
+            
+            const electronMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x4cc9f0, 
+                emissive: 0x4361ee,
+                emissiveIntensity: 0.5,
+                shininess: 50
+            });
+            
+            // Electron orbit material
+            const orbitMaterial = new THREE.LineBasicMaterial({ 
+                color: 0x0abeff,
+                transparent: true,
+                opacity: 0.3
+            });
+            
+            // Variables to track particles
+            let protons = [];
+            let neutrons = [];
+            let electrons = [];
+            let electronOrbits = [];
+            
+            // Element data
+            const elements = {
+                hydrogen: { protons: 1, neutrons: 0, electrons: 1, mass: 1.008, name: "Hydrogen" },
+                helium: { protons: 2, neutrons: 2, electrons: 2, mass: 4.003, name: "Helium" },
+                lithium: { protons: 3, neutrons: 4, electrons: 3, mass: 6.941, name: "Lithium" },
+                carbon: { protons: 6, neutrons: 6, electrons: 6, mass: 12.011, name: "Carbon" },
+                oxygen: { protons: 8, neutrons: 8, electrons: 8, mass: 15.999, name: "Oxygen" },
+                custom: { protons: 1, neutrons: 0, electrons: 1, mass: 1.008, name: "Custom" }
+            };
+            
+            // Function to create a proton
+            function createProton(x = 0, y = 0, z = 0) {
+                const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+                const proton = new THREE.Mesh(geometry, protonMaterial);
+                proton.position.set(x, y, z);
+                nucleus.add(proton);
+                protons.push(proton);
+                return proton;
+            }
+            
+            // Function to create a neutron
+            function createNeutron(x = 0, y = 0, z = 0) {
+                const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+                const neutron = new THREE.Mesh(geometry, neutronMaterial);
+                neutron.position.set(x, y, z);
+                nucleus.add(neutron);
+                neutrons.push(neutron);
+                return neutron;
+            }
+            
+            // Function to create an electron
+            function createElectron(shellRadius, angle) {
+                const geometry = new THREE.SphereGeometry(0.1, 32, 32);
+                const electron = new THREE.Mesh(geometry, electronMaterial);
+                
+                // Position on the shell
+                electron.position.x = shellRadius * Math.cos(angle);
+                electron.position.y = shellRadius * Math.sin(angle);
+                electron.position.z = 0;
+                
+                electronShells.add(electron);
+                electrons.push({
+                    mesh: electron,
+                    shellRadius: shellRadius,
+                    angle: angle,
+                    speed: 0.02 + Math.random() * 0.01
+                });
+                
+                return electron;
+            }
+            
+            // Function to create electron orbit
+            function createElectronOrbit(shellRadius) {
+                const orbitGeometry = new THREE.BufferGeometry();
+                const orbitPoints = [];
+                
+                for (let i = 0; i <= 64; i++) {
+                    const angle = (i / 64) * Math.PI * 2;
+                    orbitPoints.push(
+                        shellRadius * Math.cos(angle),
+                        shellRadius * Math.sin(angle),
+                        0
+                    );
+                }
+                
+                orbitGeometry.setAttribute('position', new THREE.Float32BufferAttribute(orbitPoints, 3));
+                const orbit = new THREE.Line(orbitGeometry, orbitMaterial);
+                
+                // Rotate orbit to give 3D effect
+                orbit.rotation.x = Math.random() * Math.PI;
+                orbit.rotation.y = Math.random() * Math.PI;
+                
+                electronShells.add(orbit);
+                electronOrbits.push(orbit);
+                
+                return orbit;
+            }
+            
+            // Function to clear all particles
+            function clearAtom() {
+                // Remove protons
+                for (let i = protons.length - 1; i >= 0; i--) {
+                    nucleus.remove(protons[i]);
+                }
+                protons = [];
+                
+                // Remove neutrons
+                for (let i = neutrons.length - 1; i >= 0; i--) {
+                    nucleus.remove(neutrons[i]);
+                }
+                neutrons = [];
+                
+                // Remove electrons
+                for (let i = electrons.length - 1; i >= 0; i--) {
+                    electronShells.remove(electrons[i].mesh);
+                }
+                electrons = [];
+                
+                // Remove electron orbits
+                for (let i = electronOrbits.length - 1; i >= 0; i--) {
+                    electronShells.remove(electronOrbits[i]);
+                }
+                electronOrbits = [];
+            }
+            
+            // Function to generate atom based on current settings
+            function generateAtom() {
+                clearAtom();
+                
+                const protonCount = parseInt(document.getElementById('proton-count').value);
+                const neutronCount = parseInt(document.getElementById('neutron-count').value);
+                const electronCount = parseInt(document.getElementById('electron-count').value);
+                
+                // Update display
+                document.getElementById('atomic-number').textContent = protonCount;
+                document.getElementById('atomic-mass').textContent = (protonCount + neutronCount).toFixed(3) + ' u';
+                
+                // Create nucleus particles with Fibonacci spiral distribution
+                const goldenRatio = (1 + Math.sqrt(5)) / 2;
+                const angleIncrement = Math.PI * 2 * goldenRatio;
+                
+                // Create protons
+                for (let i = 0; i < protonCount; i++) {
+                    const t = i / protonCount;
+                    const inclination = Math.acos(1 - 2 * t);
+                    const azimuth = angleIncrement * i;
+                    
+                    const radius = 0.3;
+                    const x = radius * Math.sin(inclination) * Math.cos(azimuth);
+                    const y = radius * Math.sin(inclination) * Math.sin(azimuth);
+                    const z = radius * Math.cos(inclination);
+                    
+                    createProton(x, y, z);
+                }
+                
+                // Create neutrons
+                for (let i = 0; i < neutronCount; i++) {
+                    const t = i / neutronCount;
+                    const inclination = Math.acos(1 - 2 * t);
+                    const azimuth = angleIncrement * i + Math.PI/4; // Offset from protons
+                    
+                    const radius = 0.3;
+                    const x = radius * Math.sin(inclination) * Math.cos(azimuth);
+                    const y = radius * Math.sin(inclination) * Math.sin(azimuth);
+                    const z = radius * Math.cos(inclination);
+                    
+                    createNeutron(x, y, z);
+                }
+                
+                // Create electron shells based on electron configuration
+                const electronConfig = calculateElectronConfiguration(electronCount);
+                let shellRadius = 1.0;
+                let electronIndex = 0;
+                
+                for (let shell = 0; shell < electronConfig.length; shell++) {
+                    const electronsInShell = electronConfig[shell];
+                    if (electronsInShell > 0) {
+                        // Create orbit for this shell
+                        createElectronOrbit(shellRadius);
+                        
+                        // Add electrons to this shell
+                        for (let e = 0; e < electronsInShell; e++) {
+                            const angle = (e / electronsInShell) * Math.PI * 2;
+                            createElectron(shellRadius, angle);
+                            electronIndex++;
+                        }
+                        
+                        // Increase radius for next shell
+                        shellRadius += 0.8;
+                    }
+                }
+                
+                // Update system status
+                document.getElementById('system-status').textContent = "ATOM GENERATED";
+                document.getElementById('system-status').className = "text-green-400 mono";
+                
+                // Calculate stability
+                calculateStability(protonCount, neutronCount);
+            }
+            
+            // Calculate electron configuration (simplified)
+            function calculateElectronConfiguration(electronCount) {
+                const shells = [2, 8, 18, 32, 50]; // Maximum electrons per shell
+                const config = [];
+                let remainingElectrons = electronCount;
+                
+                for (let i = 0; i < shells.length; i++) {
+                    if (remainingElectrons <= 0) break;
+                    const electronsInShell = Math.min(remainingElectrons, shells[i]);
+                    config.push(electronsInShell);
+                    remainingElectrons -= electronsInShell;
+                }
+                
+                // If there are still electrons left, add them to the last shell
+                if (remainingElectrons > 0) {
+                    config.push(remainingElectrons);
+                }
+                
+                return config;
+            }
+            
+            // Calculate stability based on proton/neutron ratio
+            function calculateStability(protons, neutrons) {
+                let stability = 100;
+                
+                // Simplified stability calculation
+                if (protons > 0) {
+                    // For light elements, equal numbers of protons and neutrons is stable
+                    if (protons <= 20) {
+                        const ratio = neutrons / protons;
+                        const idealRatio = 1.0;
+                        const deviation = Math.abs(ratio - idealRatio);
+                        stability -= deviation * 30;
+                    } 
+                    // For heavier elements, more neutrons than protons is stable
+                    else {
+                        const ratio = neutrons / protons;
+                        const idealRatio = 1.5;
+                        const deviation = Math.abs(ratio - idealRatio);
+                        stability -= deviation * 20;
+                    }
+                    
+                    // Magic numbers are more stable
+                    const magicNumbers = [2, 8, 20, 28, 50, 82, 126];
+                    if (magicNumbers.includes(protons) || magicNumbers.includes(neutrons)) {
+                        stability += 10;
+                    }
+                }
+                
+                // Ensure stability is within bounds
+                stability = Math.max(0, Math.min(100, stability));
+                
+                // Update UI
+                document.getElementById('stability-value').textContent = stability.toFixed(1) + '%';
+                document.getElementById('stability-bar').style.width = stability + '%';
+                
+                // Update color based on stability
+                if (stability > 80) {
+                    document.getElementById('stability-value').className = 'text-green-400';
+                    document.getElementById('stability-bar').className = 'progress-fill bg-green-400';
+                } else if (stability > 50) {
+                    document.getElementById('stability-value').className = 'text-yellow-400';
+                    document.getElementById('stability-bar').className = 'progress-fill bg-yellow-400';
+                } else {
+                    document.getElementById('stability-value').className = 'text-red-400';
+                    document.getElementById('stability-bar').className = 'progress-fill bg-red-400';
+                }
+                
+                // Update energy output based on stability
+                const energyOutput = (100 - stability) * 0.05 + 0.5;
+                document.getElementById('energy-value').textContent = energyOutput.toFixed(2) + ' GW';
+                document.getElementById('energy-bar').style.width = (energyOutput / 5 * 100) + '%';
+            }
+            
+            // Function to separate particles
+            function separateParticles() {
+                // Animate protons moving outward
+                for (let i = 0; i < protons.length; i++) {
+                    const proton = protons[i];
+                    const direction = new THREE.Vector3(
+                        proton.position.x,
+                        proton.position.y,
+                        proton.position.z
+                    ).normalize();
+                    
+                    // Animate proton moving outward
+                    animateParticleMovement(proton, direction, 2.0);
+                }
+                
+                // Animate neutrons moving outward
+                for (let i = 0; i < neutrons.length; i++) {
+                    const neutron = neutrons[i];
+                    const direction = new THREE.Vector3(
+                        neutron.position.x,
+                        neutron.position.y,
+                        neutron.position.z
+                    ).normalize();
+                    
+                    // Animate neutron moving outward
+                    animateParticleMovement(neutron, direction, 1.5);
+                }
+                
+                // Update system status
+                document.getElementById('system-status').textContent = "PARTICLES SEPARATED";
+                document.getElementById('system-status').className = "text-yellow-400 mono";
+            }
+            
+            // Function to animate particle movement
+            function animateParticleMovement(particle, direction, distance) {
+                const startPosition = particle.position.clone();
+                const endPosition = startPosition.clone().add(direction.multiplyScalar(distance));
+                const duration = 1000; // 1 second
+                const startTime = Date.now();
+                
+                function animate() {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Ease out cubic function
+                    const easeProgress = 1 - Math.pow(1 - progress, 3);
+                    
+                    particle.position.lerpVectors(startPosition, endPosition, easeProgress);
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    }
+                }
+                
+                animate();
+            }
+            
+            // Function to reset atom to original state
+            function resetAtom() {
+                // Reset nucleus position
+                nucleus.position.set(0, 0, 0);
+                
+                // Reset electron shells position
+                electronShells.position.set(0, 0, 0);
+                
+                // Regenerate atom
+                generateAtom();
+                
+                // Update system status
+                document.getElementById('system-status').textContent = "SIMULATION RESET";
+                document.getElementById('system-status').className = "text-blue-400 mono";
+            }
+            
+            // Function to initiate fusion
+            function initiateFusion() {
+                // Update reactor status
+                document.getElementById('reactor-status').textContent = "ACTIVE";
+                document.getElementById('reactor-status').className = "text-xl font-bold text-yellow-400";
+                document.getElementById('fusion-status').textContent = "IN PROGRESS";
+                
+                // Animate fusion progress
+                let progress = 0;
+                const fusionInterval = setInterval(() => {
+                    progress += 1;
+                    document.getElementById('fusion-progress').textContent = progress + '%';
+                    document.getElementById('fusion-bar').style.width = progress + '%';
+                    
+                    if (progress >= 100) {
+                        clearInterval(fusionInterval);
+                        completeFusion();
+                    }
+                }, 50);
+                
+                // Animate reactor core
+                const reactorCore = document.querySelector('.arc-reactor-core');
+                reactorCore.style.boxShadow = '0 0 60px #ffffff';
+                reactorCore.style.background = '#ffffff';
+                
+                // Animate reactor inner
+                const reactorInner = document.querySelector('.arc-reactor-inner');
+                reactorInner.style.boxShadow = '0 0 50px var(--primary)';
+                
+                // Update system status
+                document.getElementById('system-status').textContent = "FUSION IN PROGRESS";
+                document.getElementById('system-status').className = "text-yellow-400 mono";
+            }
+            
+            // Function to complete fusion
+            function completeFusion() {
+                // Update reactor status
+                document.getElementById('reactor-status').textContent = "COMPLETE";
+                document.getElementById('reactor-status').className = "text-xl font-bold text-green-400";
+                document.getElementById('fusion-status').textContent = "SUCCESS";
+                document.getElementById('fusion-status').className = "text-green-400 text-sm";
+                
+                // Reset reactor core
+                setTimeout(() => {
+                    const reactorCore = document.querySelector('.arc-reactor-core');
+                    reactorCore.style.boxShadow = '0 0 40px #ffffff';
+                    reactorCore.style.background = '#ffffff';
+                    
+                    // Reset reactor inner
+                    const reactorInner = document.querySelector('.arc-reactor-inner');
+                    reactorInner.style.boxShadow = '0 0 30px var(--primary)';
+                }, 2000);
+                
+                // Create new element properties
+                const protonCount = parseInt(document.getElementById('proton-count').value);
+                const neutronCount = parseInt(document.getElementById('neutron-count').value);
+                const electronCount = parseInt(document.getElementById('electron-count').value);
+                
+                // Calculate properties
+                const atomicMass = protonCount + neutronCount;
+                let elementName = "Unknown";
+                let elementSymbol = "?";
+                
+                // Try to match with known elements
+                if (protonCount === 1) elementName = "Hydrogen", elementSymbol = "H";
+                else if (protonCount === 2) elementName = "Helium", elementSymbol = "He";
+                else if (protonCount === 3) elementName = "Lithium", elementSymbol = "Li";
+                else if (protonCount === 4) elementName = "Beryllium", elementSymbol = "Be";
+                else if (protonCount === 5) elementName = "Boron", elementSymbol = "B";
+                else if (protonCount === 6) elementName = "Carbon", elementSymbol = "C";
+                else if (protonCount === 7) elementName = "Nitrogen", elementSymbol = "N";
+                else if (protonCount === 8) elementName = "Oxygen", elementSymbol = "O";
+                else if (protonCount === 9) elementName = "Fluorine", elementSymbol = "F";
+                else if (protonCount === 10) elementName = "Neon", elementSymbol = "Ne";
+                else if (protonCount > 118) elementName = "New Element", elementSymbol = "X";
+                else elementName = "Element-" + protonCount, elementSymbol = "E" + protonCount;
+                
+                // Update new element properties
+                document.getElementById('new-element-properties').innerHTML = `
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="font-bold text-white">${elementName} (${elementSymbol})</p>
+                            <p>Atomic Number: ${protonCount}</p>
+                            <p>Atomic Mass: ${atomicMass.toFixed(3)} u</p>
+                        </div>
+                        <div>
+                            <p>Protons: ${protonCount}</p>
+                            <p>Neutrons: ${neutronCount}</p>
+                            <p>Electrons: ${electronCount}</p>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <p class="text-green-400">Element successfully synthesized!</p>
+                    </div>
+                `;
+                
+                // Update system status
+                document.getElementById('system-status').textContent = "FUSION COMPLETE";
+                document.getElementById('system-status').className = "text-green-400 mono";
+            }
+            
+            // Function to update time
+            function updateTime() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString([], { hour12: false });
+                document.getElementById('current-time').textContent = timeString;
+            }
+            
+            // Update time every second
+            setInterval(updateTime, 1000);
+            updateTime();
+            
+            // Element selector change handler
+            document.getElementById('element-selector').addEventListener('change', function() {
+                const selectedElement = elements[this.value];
+                
+                if (selectedElement) {
+                    document.getElementById('proton-count').value = selectedElement.protons;
+                    document.getElementById('neutron-count').value = selectedElement.neutrons;
+                    document.getElementById('electron-count').value = selectedElement.electrons;
+                    
+                    // Generate atom with new values
+                    generateAtom();
+                }
+            });
+            
+            // Button event listeners
+            document.getElementById('btn-generate').addEventListener('click', generateAtom);
+            document.getElementById('btn-separate').addEventListener('click', separateParticles);
+            document.getElementById('btn-reset').addEventListener('click', resetAtom);
+            document.getElementById('btn-fusion').addEventListener('click', initiateFusion);
+            document.getElementById('btn-start-fusion').addEventListener('click', initiateFusion);
+            
+            // Particle count buttons
+            document.getElementById('proton-plus').addEventListener('click', function() {
+                const input = document.getElementById('proton-count');
+                input.value = Math.min(parseInt(input.value) + 1, parseInt(input.max));
+                document.getElementById('electron-count').value = input.value; // Keep electrons equal to protons by default
+            });
+            
+            document.getElementById('proton-minus').addEventListener('click', function() {
+                const input = document.getElementById('proton-count');
+                input.value = Math.max(parseInt(input.value) - 1, parseInt(input.min));
+                document.getElementById('electron-count').value = input.value; // Keep electrons equal to protons by default
+            });
+            
+            document.getElementById('neutron-plus').addEventListener('click', function() {
+                const input = document.getElementById('neutron-count');
+                input.value = Math.min(parseInt(input.value) + 1, parseInt(input.max));
+            });
+            
+            document.getElementById('neutron-minus').addEventListener('click', function() {
+                const input = document.getElementById('neutron-count');
+                input.value = Math.max(parseInt(input.value) - 1, parseInt(input.min));
+            });
+            
+            document.getElementById('electron-plus').addEventListener('click', function() {
+                const input = document.getElementById('electron-count');
+                input.value = Math.min(parseInt(input.value) + 1, parseInt(input.max));
+            });
+            
+            document.getElementById('electron-minus').addEventListener('click', function() {
+                const input = document.getElementById('electron-count');
+                input.value = Math.max(parseInt(input.value) - 1, parseInt(input.min));
+            });
+            
+            // View buttons
+            document.getElementById('btn-view-3d').addEventListener('click', function() {
+                camera.position.set(5, 2, 5);
+                camera.lookAt(0, 0, 0);
+            });
+            
+            document.getElementById('btn-view-2d').addEventListener('click', function() {
+                camera.position.set(0, 0, 5);
+                camera.lookAt(0, 0, 0);
+            });
+            
+            // Orbit camera button
+            let isOrbiting = false;
+            document.getElementById('btn-orbit').addEventListener('click', function() {
+                isOrbiting = !isOrbiting;
+                this.textContent = isOrbiting ? "STOP ORBIT" : "ORBIT CAMERA";
+            });
+            
+            // Explode view button
+            document.getElementById('btn-explode').addEventListener('click', separateParticles);
+            
+            // Screenshot button
+            document.getElementById('btn-screenshot').addEventListener('click', function() {
+                document.getElementById('system-status').textContent = "HOLOGRAM CAPTURED";
+                document.getElementById('system-status').className = "text-green-400 mono";
+            });
+            
+            // Export button
+            document.getElementById('btn-export').addEventListener('click', function() {
+                document.getElementById('system-status').textContent = "MODEL EXPORTED";
+                document.getElementById('system-status').className = "text-green-400 mono";
+            });
+            
+            // Tooltip functionality
+            const tooltip = document.getElementById('tooltip');
+            const tooltipElements = document.querySelectorAll('.element-card, .control-btn, .particle-container');
+            
+            tooltipElements.forEach(element => {
+                element.addEventListener('mouseover', function(e) {
+                    let tooltipText = "";
+                    
+                    if (this.classList.contains('element-card')) {
+                        const elementSymbol = this.querySelector('.text-3xl')?.textContent;
+                        if (elementSymbol === "?") {
+                            tooltipText = "Create a new element through fusion";
+                        } else {
+                            tooltipText = "Click to select this element";
+                        }
+                    } else if (this.classList.contains('control-btn')) {
+                        tooltipText = this.textContent;
+                    } else if (this.classList.contains('particle-container')) {
+                        tooltipText = "Drag to fusion chamber";
+                    }
+                    
+                    if (tooltipText) {
+                        tooltip.textContent = tooltipText;
+                        tooltip.style.left = e.pageX + 10 + 'px';
+                        tooltip.style.top = e.pageY + 10 + 'px';
+                        tooltip.style.opacity = 1;
+                    }
+                });
+                
+                element.addEventListener('mousemove', function(e) {
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                });
+                
+                element.addEventListener('mouseout', function() {
+                    tooltip.style.opacity = 0;
+                });
+            });
+            
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                // Rotate nucleus slowly
+                nucleus.rotation.y += 0.005;
+                nucleus.rotation.x += 0.002;
+                
+                // Update electron positions
+                for (let i = 0; i < electrons.length; i++) {
+                    const electron = electrons[i];
+                    electron.angle += electron.speed;
+                    
+                    electron.mesh.position.x = electron.shellRadius * Math.cos(electron.angle);
+                    electron.mesh.position.y = electron.shellRadius * Math.sin(electron.angle);
+                }
+                
+                // Rotate electron shells
+                electronShells.rotation.y += 0.002;
+                electronShells.rotation.x += 0.001;
+                
+                // Orbit camera if enabled
+                if (isOrbiting) {
+                    const time = Date.now() * 0.001;
+                    camera.position.x = Math.cos(time * 0.5) * 5;
+                    camera.position.z = Math.sin(time * 0.5) * 5;
+                    camera.lookAt(0, 0, 0);
+                }
+                
+                renderer.render(scene, camera);
+            }
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                camera.aspect = canvas.clientWidth / canvas.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            });
+            
+            // Generate initial atom
+            generateAtom();
+            
+            // Start animation loop
+            animate();
+        });
+    </script>
+</body>
+</html>
